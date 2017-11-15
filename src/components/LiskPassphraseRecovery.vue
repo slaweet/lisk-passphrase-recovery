@@ -5,7 +5,22 @@
     <input v-model="passphrase" placeholder="Enter Passphrase"/>
     <br>
     <button v-on:click="lookupPassphrase">Search for a valid variation of the entered passphrase </button>
-    <div> {{ active }} </div>
+    <div v-if="active">
+      <div> Trying passphrase: </div>
+      <div> {{ active }} </div>
+    </div>
+    <div v-if="found">
+      <h4> Found a passphrase with some LSK: </h4>
+      <h3>{{ found }} </h3>
+      <div>
+        <a :href="'https://explorer.lisk.io/address/' + address">
+          {{ address }}
+        </a>
+      </div>
+    </div>
+    <div v-if="error">
+      <h4>Error: {{ error }} </h4>
+    </div>
   </div>
 </template>
 
@@ -13,27 +28,12 @@
 import bip39 from 'bip39';
 import Lisk from 'lisk-js';
 
-const resolvePass = (validVariations) => {
-  const passphrase = validVariations.pop();
-  const { publicKey } = Lisk.crypto.getKeys(passphrase);
-  const address = Lisk.crypto.getAddress(publicKey);
-  Lisk.api({ testnet: false }).getAccount(address, (data) => {
-    if (data.success) {
-      alert(`Found a passphrase with some LSK on it: ${passphrase}`); // eslint-disable-line no-alert
-    } else if (validVariations.length > 0) {
-      resolvePass(validVariations);
-    } else {
-      alert('No match found'); // eslint-disable-line no-alert
-    }
-  });
-};
 
 export default {
   name: 'LiskPassphraseRecovery',
   methods: {
-    lookupPassphrase: () => {
-      const passphrase = this.a.data().passphrase;
-      this.a.data().result = this.a.data().passphrase;
+    lookupPassphrase() {
+      const passphrase = this.passphrase;
 
       const words = passphrase.split(' ');
       const validVariations = [];
@@ -48,12 +48,32 @@ export default {
           }
         });
       });
-      resolvePass(validVariations);
+      this.resolvePass(validVariations);
+    },
+    resolvePass(validVariations) {
+      const passphrase = validVariations.pop();
+      this.active = passphrase;
+      const { publicKey } = Lisk.crypto.getKeys(passphrase);
+      const address = Lisk.crypto.getAddress(publicKey);
+      Lisk.api({ testnet: false }).getAccount(address, (data) => {
+        if (data.success) {
+          this.found = passphrase;
+          this.active = '';
+          this.address = address;
+        } else if (validVariations.length > 0) {
+          this.resolvePass(validVariations);
+        } else {
+          this.error = 'No match found';
+          this.active = '';
+        }
+      });
     },
   },
   data: () => ({
     passphrase: '',
     active: '',
+    found: '',
+    error: '',
   }),
 };
 </script>
