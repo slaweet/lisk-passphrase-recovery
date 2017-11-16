@@ -48,7 +48,7 @@ export default {
       const { publicKey } = Lisk.crypto.getKeys(passphrase);
       const address = Lisk.crypto.getAddress(publicKey);
       const testnet = !!(new URL(location.toString()).searchParams.get('testnet'));
-      Lisk.api({ testnet }).getAccount(address, callback);
+      Lisk.api({ testnet, ssl: true, port: 443 }).getAccount(address, callback);
     },
     resolvePass(validVariations) {
       const passphrase = validVariations.pop();
