@@ -1,21 +1,19 @@
 <template>
   <div class="form">
-    <h1>Lisk Passphrase Recovery</h1>
-    <p>Recover a 12-word Lisk passphrase with exactly one incorrect word</p>
+    <h1>Lisk Passphrase Whitespace Checker</h1>
+    <p>Check a 12-word Lisk passphrase for extra white space</p>
     <input v-model="passphrase" placeholder="Enter Passphrase"/>
     <br>
     <button v-on:click="lookupPassphrase">Search for a valid variation of the entered passphrase </button>
     <div v-if="active">
       <div> Trying passphrase: </div>
-      <div> {{ active }} </div>
+      <pre> {{ active }} </pre>
     </div>
     <div v-if="found">
-      <h4> Found a passphrase with some LSK: </h4>
-      <h3>{{ found }} </h3>
+      <h4> Found a simillar passphrase with {{account.balance / 1e8}} LSK </h4>
+      <input v-model="found" readonly placeholder="Enter Passphrase"/>
       <div>
-        <a :href="'https://explorer.lisk.io/address/' + address">
-          {{ address }}
-        </a>
+        {{ hint }}
       </div>
     </div>
     <div v-if="error">
@@ -25,7 +23,6 @@
 </template>
 
 <script>
-import bip39 from 'bip39';
 import Lisk from 'lisk-js';
 
 
@@ -33,35 +30,46 @@ export default {
   name: 'LiskPassphraseRecovery',
   methods: {
     lookupPassphrase() {
+      this.found = '';
+      this.error = '';
+      this.hint = '';
       const passphrase = this.passphrase;
 
       const words = passphrase.split(' ');
       const validVariations = [];
-      words.forEach((word, i) => {
-        bip39.wordlists.EN.forEach((dictWord) => {
-          const ws = [...words];
-          ws[i] = dictWord;
-          const pass = ws.join(' ');
-          const isValid = bip39.validateMnemonic(pass);
-          if (isValid) {
-            validVariations.push(pass);
-          }
-        });
+      [...words, ''].forEach((word, i) => {
+        const ws = [...words];
+        ws.splice(i, 0, '');
+        validVariations.push(ws.join(' '));
       });
       this.resolvePass(validVariations);
+    },
+    getAccount(passphrase, callback) {
+      const { publicKey } = Lisk.crypto.getKeys(passphrase);
+      const address = Lisk.crypto.getAddress(publicKey);
+      const testnet = !!(new URL(location.toString()).searchParams.get('testnet'));
+      Lisk.api({ testnet }).getAccount(address, callback);
     },
     resolvePass(validVariations) {
       const passphrase = validVariations.pop();
       this.active = passphrase;
-      const { publicKey } = Lisk.crypto.getKeys(passphrase);
-      const address = Lisk.crypto.getAddress(publicKey);
-      Lisk.api({ testnet: false }).getAccount(address, (data) => {
+      this.getAccount(passphrase, (data) => {
         if (data.success) {
           this.found = passphrase;
           this.active = '';
-          this.address = address;
+          this.account = data.account;
+          const words = passphrase.split(' ');
+          const indexOfSpace = words.indexOf('');
+          if (indexOfSpace === words.length - 1) {
+            this.hint = 'Hint: There is extra space after the last word';
+          } else if (words[indexOfSpace + 1]) {
+            this.hint = `Hint: There is extra space before word "${words[indexOfSpace + 1]}"`;
+          }
         } else if (validVariations.length > 0) {
-          this.resolvePass(validVariations);
+          const that = this;
+          setTimeout(() => {
+            that.resolvePass(validVariations);
+          }, 100);
         } else {
           this.error = 'No match found';
           this.active = '';
@@ -74,6 +82,7 @@ export default {
     active: '',
     found: '',
     error: '',
+    hint: '',
   }),
 };
 </script>
