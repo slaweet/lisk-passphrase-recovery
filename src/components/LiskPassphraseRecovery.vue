@@ -66,10 +66,7 @@ export default {
             this.hint = `Hint: There is extra space before word "${words[indexOfSpace + 1]}"`;
           }
         } else if (validVariations.length > 0) {
-          const that = this;
-          setTimeout(() => {
-            that.resolvePass(validVariations);
-          }, 100);
+          this.resolvePass(validVariations);
         } else {
           this.error = 'No match found';
           this.active = '';
